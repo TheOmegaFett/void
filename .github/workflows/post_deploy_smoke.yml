@@ -1,0 +1,57 @@
+name: Post-Deploy Smoke Tests
+
+on:
+  workflow_run:
+    workflows: ["CD - Deploy Staging", "CD - Deploy Production"]
+    types: [completed]
+  schedule:
+    - cron: "0 18 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: |
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine target URL
+        run: |
+          mkdir -p smoke-artifacts
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            WF="${{ github.event.workflow_run.name }}"
+            if [[ "$WF" == "CD - Deploy Staging" ]]; then
+              echo "TARGET_URL=${{ secrets.STAGING_URL }}" >> $GITHUB_ENV
+              echo "ENV=staging" >> $GITHUB_ENV
+            else
+              echo "TARGET_URL=${{ secrets.PROD_URL }}" >> $GITHUB_ENV
+              echo "ENV=production" >> $GITHUB_ENV
+            fi
+          else
+            # On schedule, test both
+            echo "ENV=scheduled" >> $GITHUB_ENV
+          fi
+
+      - name: Smoke test (workflow_run target)
+        if: github.event_name == 'workflow_run'
+        run: |
+          echo "Smoke testing $ENV: $TARGET_URL" | tee smoke-artifacts/smoke-$ENV.log
+          curl -fsS "$TARGET_URL/health" 2>&1 | tee -a smoke-artifacts/smoke-$ENV.log
+
+      - name: Smoke test (scheduled - staging + prod)
+        if: github.event_name == 'schedule'
+        run: |
+          echo "Scheduled smoke: staging ${{ secrets.STAGING_URL }}" | tee smoke-artifacts/smoke-scheduled.log
+          curl -fsS "${{ secrets.STAGING_URL }}/health" 2>&1 | tee -a smoke-artifacts/smoke-scheduled.log
+          echo "Scheduled smoke: prod ${{ secrets.PROD_URL }}" | tee -a smoke-artifacts/smoke-scheduled.log
+          curl -fsS "${{ secrets.PROD_URL }}/health" 2>&1 | tee -a smoke-artifacts/smoke-scheduled.log
+
+      - name: Upload smoke logs (persistent)
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-artifacts
+          path: smoke-artifacts
+          retention-days: 14

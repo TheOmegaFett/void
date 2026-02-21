@@ -1,0 +1,48 @@
+name: CI - Test & Quality
+
+on:
+  pull_request:
+  push:
+    branches: ["main", "develop"]
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (with cache)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint --if-present
+
+      # Persistent logs + formatted JUnit output
+      - name: Run tests (JUnit + log file)
+        run: |
+          mkdir -p test-artifacts
+          npm run test:junit 2>&1 | tee test-artifacts/test-output.log
+        env:
+          JEST_JUNIT_OUTPUT_DIR: test-artifacts
+          JEST_JUNIT_OUTPUT_NAME: junit.xml
+
+      - name: Upload test artifacts (persistent logs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: test-artifacts
+          retention-days: 14
