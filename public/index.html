@@ -1,0 +1,1263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Void Flow WOW+ — GPU Bloom / Grade / Drift / Record / Analysis</title>
+<style>
+  html,body{height:100%;margin:0;background:#05070c;color:#e6f2ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  canvas{width:100%;height:100%;display:block}
+  #ui{
+    position:fixed;left:14px;top:14px;right:14px;display:flex;gap:12px;z-index:10;
+    pointer-events:none;
+  }
+  .card{
+    pointer-events:auto;
+    background:rgba(10,14,22,.62);
+    border:1px solid rgba(150,190,240,.16);
+    backdrop-filter: blur(10px);
+    border-radius:16px;
+    box-shadow:0 12px 38px rgba(0,0,0,.55);
+    padding:12px 12px;
+    max-width: 760px;
+  }
+  .title{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(210,235,255,.92)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  label{font-size:12px;color:rgba(190,215,245,.9)}
+  input[type=range]{width:120px}
+  select,button,input{
+    background:rgba(5,8,12,.78);
+    border:1px solid rgba(150,190,240,.18);
+    color:#e8f2ff;border-radius:12px;
+    padding:8px 10px;font-size:13px;
+  }
+  button{cursor:pointer}
+  button:hover{border-color:rgba(120,210,255,.55)}
+  .muted{font-size:12px;color:rgba(160,190,220,.95);line-height:1.35;margin-top:10px}
+  .kbd{font-family:ui-monospace,Menlo,Consolas,monospace;background:rgba(255,255,255,.08);padding:1px 6px;border-radius:8px;border:1px solid rgba(255,255,255,.12)}
+  .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid rgba(140,200,255,.22);background:rgba(140,200,255,.08);font-size:12px}
+  .right{margin-left:auto}
+  #toast{
+    position:fixed;left:14px;bottom:14px;
+    background:rgba(8,12,18,.72);
+    border:1px solid rgba(150,190,240,.16);
+    color:rgba(225,240,255,.95);
+    padding:10px 12px;border-radius:14px;
+    box-shadow:0 12px 38px rgba(0,0,0,.55);
+    opacity:0; transform: translateY(8px);
+    transition: opacity .18s ease, transform .18s ease;
+    pointer-events:none;
+  }
+  #toast.show{opacity:1; transform: translateY(0px);}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="toast"></div>
+
+<div id="ui">
+  <div class="card">
+    <div class="row" style="margin-top:0">
+      <div class="title">Void Flow WOW+ — GPU bloom / grading / drift / record / analysis</div>
+      <div class="pill right" id="hud">— fps</div>
+    </div>
+
+    <div class="row">
+      <label>Preset</label>
+      <select id="preset">
+        <option value="0">A: Filament Nebula</option>
+        <option value="1">B: Living Membranes</option>
+        <option value="2" selected>C: Void Knot Attractor</option>
+        <option value="3">D: Crystal Vortices</option>
+      </select>
+
+      <button id="reseed">Reseed</button>
+      <button id="pause">Pause</button>
+
+      <button id="recBtn">● Record</button>
+      <button id="stopBtn" disabled>Stop</button>
+
+      <button id="savePreset">Save JSON</button>
+      <label style="display:inline-flex;gap:8px;align-items:center">
+        Load JSON <input id="loadPreset" type="file" accept="application/json" style="padding:6px;max-width:220px"/>
+      </label>
+    </div>
+
+    <div class="row">
+      <label>Mode</label>
+      <select id="mode">
+        <option value="art" selected>Art</option>
+        <option value="analysis">Analysis</option>
+      </select>
+
+      <label>Overlay</label>
+      <select id="overlay">
+        <option value="0">None</option>
+        <option value="1">Curl</option>
+        <option value="2">Divergence</option>
+        <option value="3">Streamlines</option>
+      </select>
+
+      <label>Overlay α</label><input id="overlayA" type="range" min="0" max="1" step="0.01" value="0.65"/>
+    </div>
+
+    <div class="row">
+      <label>Particle grid</label>
+      <select id="grid">
+        <option value="384">384 (147k)</option>
+        <option value="512" selected>512 (262k)</option>
+        <option value="768">768 (590k)</option>
+        <option value="1024">1024 (1.05M)</option>
+      </select>
+
+      <label>Trail</label><input id="trail" type="range" min="0.02" max="0.18" step="0.005" value="0.06"/>
+      <label>Point</label><input id="pt" type="range" min="0.6" max="2.8" step="0.05" value="1.35"/>
+
+      <label>Bloom</label><input id="bloom" type="range" min="0" max="2.5" step="0.01" value="0.95"/>
+      <label>BloomTh</label><input id="bloomTh" type="range" min="0.0" max="1.0" step="0.01" value="0.18"/>
+    </div>
+
+    <div class="row">
+      <label>Speed</label><input id="speed" type="range" min="0.05" max="3.0" step="0.01" value="1.15"/>
+      <label>α</label><input id="alpha" type="range" min="0.10" max="1.0" step="0.005" value="0.84"/>
+      <label>λ</label><input id="lambda" type="range" min="0.00" max="4.0" step="0.01" value="2.10"/>
+      <label>β</label><input id="beta" type="range" min="0.00" max="3.0" step="0.01" value="1.85"/>
+      <label>Noise</label><input id="noise" type="range" min="0.00" max="1.0" step="0.01" value="0.16"/>
+      <label>Zoom</label><input id="zoom" type="range" min="0.5" max="9.0" step="0.01" value="2.15"/>
+    </div>
+
+    <div class="row">
+      <label>Exposure</label><input id="exposure" type="range" min="0.2" max="2.8" step="0.01" value="1.25"/>
+      <label>Contrast</label><input id="contrast" type="range" min="0.6" max="2.2" step="0.01" value="1.15"/>
+      <label>Saturation</label><input id="sat" type="range" min="0.0" max="2.2" step="0.01" value="1.10"/>
+      <label>Gamma</label><input id="gamma" type="range" min="0.7" max="1.6" step="0.01" value="1.05"/>
+      <label>Palette</label><input id="palSpeed" type="range" min="0.0" max="2.5" step="0.01" value="0.55"/>
+    </div>
+
+    <div class="row">
+      <label>Camera drift</label>
+      <select id="driftOn">
+        <option value="0">Off</option>
+        <option value="1" selected>On</option>
+      </select>
+      <label>Drift</label><input id="driftAmt" type="range" min="0.0" max="1.0" step="0.01" value="0.25"/>
+      <label>DriftSpd</label><input id="driftSpd" type="range" min="0.05" max="1.5" step="0.01" value="0.35"/>
+    </div>
+
+    <div class="muted">
+      Click to recenter. Scroll to zoom. Keys <span class="kbd">1</span>–<span class="kbd">4</span> presets.
+      For speed: set grid to <b>512</b> or <b>384</b>. Bloom costs GPU time; lower Bloom or use 1M particles with Bloom ~0.3.
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const toastEl = document.getElementById('toast');
+  const hudEl = document.getElementById('hud');
+
+  const gl = canvas.getContext('webgl2', { antialias:false, alpha:false, depth:false, stencil:false, preserveDrawingBuffer:false });
+  if (!gl) { document.body.innerHTML = "<div style='padding:18px;color:#fff'>WebGL2 not available.</div>"; return; }
+
+  const $ = (id)=>document.getElementById(id);
+  const ui = {
+    preset:$('preset'), reseed:$('reseed'), pause:$('pause'),
+    recBtn:$('recBtn'), stopBtn:$('stopBtn'),
+    savePreset:$('savePreset'), loadPreset:$('loadPreset'),
+    mode:$('mode'), overlay:$('overlay'), overlayA:$('overlayA'),
+    grid:$('grid'), trail:$('trail'), pt:$('pt'),
+    bloom:$('bloom'), bloomTh:$('bloomTh'),
+    speed:$('speed'), alpha:$('alpha'), lambda:$('lambda'), beta:$('beta'),
+    noise:$('noise'), zoom:$('zoom'),
+    exposure:$('exposure'), contrast:$('contrast'), sat:$('sat'), gamma:$('gamma'),
+    palSpeed:$('palSpeed'),
+    driftOn:$('driftOn'), driftAmt:$('driftAmt'), driftSpd:$('driftSpd'),
+  };
+
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastEl._t);
+    toastEl._t = setTimeout(()=>toastEl.classList.remove('show'), 1800);
+  }
+
+  // --- Extensions ---
+  const extFloat = gl.getExtension('EXT_color_buffer_float');
+  if (!extFloat) {
+    document.body.innerHTML = "<div style='padding:18px;color:#fff'>Need EXT_color_buffer_float for float FBO. Try Chrome/Edge.</div>";
+    return;
+  }
+
+  // --- Resize ---
+  function dpr(){ return Math.min(2, window.devicePixelRatio||1); }
+  function resize(){
+    const r = dpr();
+    canvas.width = Math.floor(innerWidth*r);
+    canvas.height= Math.floor(innerHeight*r);
+    gl.viewport(0,0,canvas.width,canvas.height);
+  }
+  addEventListener('resize', ()=>{ resize(); recreateScreenBuffers(); recreateBloomBuffers(); });
+  resize();
+
+  // Camera in world/theta space
+  let camX=-0.12, camY=0.00;
+
+  canvas.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    const z = +ui.zoom.value;
+    const dz = Math.exp(-e.deltaY * 0.0012);
+    ui.zoom.value = Math.max(+ui.zoom.min, Math.min(+ui.zoom.max, z*dz)).toFixed(3);
+  }, {passive:false});
+
+  canvas.addEventListener('click', (e)=>{
+    const r=dpr();
+    const px = e.clientX*r, py = e.clientY*r;
+    const [wx,wy] = screenToWorld(px,py);
+    camX = wx; camY = wy;
+  });
+
+  addEventListener('keydown', (e)=>{
+    if (e.key>='1' && e.key<='4'){ ui.preset.value = String((+e.key)-1); applyPreset(+ui.preset.value); }
+  });
+
+  function screenToWorld(px,py){
+    const w=canvas.width,h=canvas.height;
+    const z=+ui.zoom.value;
+    const aspect = w/h;
+    let x = (px/(w-1))*2 - 1;
+    let y = (py/(h-1))*2 - 1;
+    x *= aspect; y *= -1;
+    const span = 3.2 / z;
+    return [camX + x*span, camY + y*span];
+  }
+
+  // --- Shader utils ---
+  function compile(type, src){
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
+      const log = gl.getShaderInfoLog(s);
+      gl.deleteShader(s);
+      throw new Error(log);
+    }
+    return s;
+  }
+  function link(vsSrc, fsSrc){
+    const p = gl.createProgram();
+    gl.attachShader(p, compile(gl.VERTEX_SHADER, vsSrc));
+    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsSrc));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)){
+      const log = gl.getProgramInfoLog(p);
+      gl.deleteProgram(p);
+      throw new Error(log);
+    }
+    return p;
+  }
+  const triVao = gl.createVertexArray();
+  gl.bindVertexArray(triVao);
+  const triBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, triBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,  3,-1, -1, 3]), gl.STATIC_DRAW);
+
+  const quadVS = `#version 300 es
+  in vec2 aPos;
+  out vec2 vUv;
+  void main(){ vUv = aPos*0.5 + 0.5; gl_Position = vec4(aPos,0,1); }`;
+
+  // --- SIM shader (advect particles) ---
+  const simFS = `#version 300 es
+  precision highp float;
+  in vec2 vUv;
+  out vec4 outState;
+
+  uniform sampler2D uState;
+  uniform float uTime;
+  uniform float uDt;
+
+  uniform int   uPreset;
+  uniform float uAlpha;
+  uniform float uLambda;
+  uniform float uBeta;
+  uniform float uNoise;
+
+  float hash(vec2 p){
+    p = fract(p*vec2(123.34, 456.21));
+    p += dot(p, p+78.233);
+    return fract(p.x*p.y);
+  }
+  float noise2(vec2 p){
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    float a = hash(i);
+    float b = hash(i+vec2(1,0));
+    float c = hash(i+vec2(0,1));
+    float d = hash(i+vec2(1,1));
+    vec2 u = f*f*(3.0-2.0*f);
+    return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
+  }
+
+  vec2 rot90(vec2 z){ return vec2(-z.y, z.x); }
+  vec2 csq(vec2 z){ return vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y); }
+  vec2 ccube(vec2 z){
+    return vec2(z.x*z.x*z.x - 3.0*z.x*z.y*z.y,
+                3.0*z.x*z.x*z.y - z.y*z.y*z.y);
+  }
+  vec2 csin(vec2 z){
+    float sx = sin(z.x), cx = cos(z.x);
+    float cy = cosh(z.y), sy = sinh(z.y);
+    return vec2(sx*cy, cx*sy);
+  }
+
+  vec2 projAxis(vec2 z, float phi){
+    vec2 u = vec2(cos(phi), sin(phi));
+    float d = dot(z,u);
+    return d*u;
+  }
+  vec2 projSoft(vec2 z, float phi, float lambda){
+    vec2 p = projAxis(z,phi);
+    vec2 perp = z - p;
+    float m = length(perp);
+    float g = 1.0 - tanh(lambda*m);
+    return mix(z,p,g);
+  }
+  float tension(vec2 fz, vec2 vz){
+    vec2 d = fz - vz;
+    return dot(d,d);
+  }
+
+  float potAt(vec2 x, float t, int preset, float alpha, float lambda){
+    float phi = (preset==2 ? 0.35 : 0.82) + 0.35*sin(t*0.17 + float(preset)*1.7);
+    vec2 drift = vec2(cos(t*0.11 + 1.3*float(preset)),
+                      sin(t*0.13 + 2.1*float(preset))) * 0.18;
+
+    vec2 s = x + 0.35*drift;
+    vec2 fz;
+    if (preset==0){
+      vec2 q = csq(s);
+      vec2 w = csin(0.85*s + vec2(0.2*sin(t*0.2),0.0));
+      fz = 0.78*q + 0.55*w;
+    } else if (preset==1){
+      vec2 c = ccube(0.75*s);
+      fz = 0.70*c + 0.35*rot90(s);
+    } else if (preset==2){
+      float braid = sin(t*0.23)*cos(t*0.19);
+      fz = csq(s) + (0.85+0.65*braid)*rot90(s);
+    } else {
+      vec2 w = csin(0.95*s);
+      vec2 q = csq(0.60*s);
+      fz = 0.90*w + 0.55*q;
+    }
+    fz *= alpha;
+    vec2 vz = projSoft(fz, phi, lambda);
+    float T = tension(fz,vz);
+    float r = length(x)+1e-6;
+    return (preset==1)
+      ? (0.70*T - 0.14*cos(2.5*r - t*0.4))
+      : (0.85*T - 0.10*cos(3.2*r + t*0.3));
+  }
+
+  vec2 field(vec2 x, float t, int preset, float alpha, float lambda, float beta, float noiseAmt){
+    float eps = 0.0025;
+    float px1 = potAt(x+vec2(eps,0), t, preset, alpha, lambda);
+    float px0 = potAt(x-vec2(eps,0), t, preset, alpha, lambda);
+    float py1 = potAt(x+vec2(0,eps), t, preset, alpha, lambda);
+    float py0 = potAt(x-vec2(0,eps), t, preset, alpha, lambda);
+    vec2 g = vec2((px1-px0)/(2.0*eps), (py1-py0)/(2.0*eps));
+
+    float swirl = beta * 0.55;
+    vec2 u = vec2(-g.y, g.x) * swirl;
+
+    float pot = potAt(x,t,preset,alpha,lambda);
+    float pull = (preset==0 ? 0.18 : (preset==2 ? 0.10 : 0.14));
+    float k = 1.0 - tanh(abs(pot));
+    u += -g * (pull * k);
+
+    if (noiseAmt > 0.0){
+      float ns = noise2(x*1.7 + vec2(t*0.25, -t*0.23));
+      float ang = (ns*2.0-1.0)*6.2831853;
+      u += vec2(cos(ang), sin(ang)) * noiseAmt * 0.12;
+    }
+    return u;
+  }
+
+  void main(){
+    vec4 s = texture(uState, vUv);
+    vec2 x = s.xy;
+    float hue = s.z;
+    float seed = s.w;
+
+    vec2 u = field(x, uTime, uPreset, uAlpha, uLambda, uBeta, uNoise);
+    vec2 nx = x + u * uDt;
+
+    float rr = dot(nx,nx);
+
+    // WebGL2-safe NaN/Inf guards (avoid isfinite())
+    bool nan = !(nx.x == nx.x) || !(nx.y == nx.y);
+    bool huge = abs(nx.x) > 1e10 || abs(nx.y) > 1e10;
+
+    if (nan || huge || rr > 16.0){
+      float a = 6.2831853 * hash(vUv + seed*7.13);
+      float r = sqrt(hash(vUv*3.1 + seed*2.7)) * 1.2;
+      nx = vec2(cos(a), sin(a)) * r;
+      hue = fract(hue + 0.17 + seed*0.11);
+      seed = fract(seed + 0.37);
+    } else {
+      float sp = length(u);
+      hue = fract(hue + 0.0015 + 0.004*sp);
+    }
+
+    outState = vec4(nx, hue, seed);
+  }`;
+
+  // --- Render particles as points ---
+  const renderVS = `#version 300 es
+  precision highp float;
+  layout(location=0) in float aIdx;
+
+  uniform sampler2D uState;
+  uniform vec2 uStateDim;
+
+  uniform vec2 uRes;
+  uniform vec2 uCenter;
+  uniform float uZoom;
+  uniform float uPointSize;
+
+  out float vHue;
+
+  void main(){
+    float w = uStateDim.x;
+    float i = aIdx;
+    float x = mod(i, w);
+    float y = floor(i / w);
+    vec2 uv = (vec2(x,y) + 0.5) / uStateDim;
+
+    vec4 s = texture(uState, uv);
+    vec2 p = s.xy;
+    vHue = s.z;
+
+    float aspect = uRes.x / uRes.y;
+    vec2 d = (p - uCenter) * (uZoom / 3.2);
+    d.x /= aspect;
+    vec2 clip = d * 2.0;
+    gl_Position = vec4(clip, 0.0, 1.0);
+    gl_PointSize = uPointSize;
+  }`;
+
+  const renderFS = `#version 300 es
+  precision highp float;
+  in float vHue;
+  out vec4 fragColor;
+
+  vec3 neon(float h, float lum){
+    float a = h * 6.2831853;
+    float r = 0.25 + 0.75*(0.5+0.5*cos(a + 0.0));
+    float g = 0.20 + 0.80*(0.5+0.5*cos(a + 2.1));
+    float b = 0.28 + 0.72*(0.5+0.5*cos(a + 4.2));
+    float L = 0.25 + 0.95*lum;
+    return vec3(r,g,b)*L;
+  }
+
+  void main(){
+    vec2 p = gl_PointCoord*2.0 - 1.0;
+    float r2 = dot(p,p);
+    float a = exp(-3.2*r2);
+    float core = exp(-22.0*r2);
+    vec3 col = neon(vHue, 0.65) * a + neon(vHue+0.08, 0.85) * core * 0.7;
+    fragColor = vec4(col, a*0.22 + core*0.18);
+  }`;
+
+  // --- Fade pass (trails) ---
+  const fadeFS = `#version 300 es
+  precision highp float;
+  in vec2 vUv;
+  out vec4 fragColor;
+  uniform sampler2D uTex;
+  uniform float uFade;
+  void main(){
+    vec3 bg = vec3(0.02,0.03,0.05);
+    vec3 c = texture(uTex, vUv).rgb;
+    c = mix(c, bg, uFade);
+    fragColor = vec4(c, 1.0);
+  }`;
+
+  // --- Bloom: bright-pass + blur h/v ---
+  const brightFS = `#version 300 es
+  precision highp float;
+  in vec2 vUv; out vec4 fragColor;
+  uniform sampler2D uTex;
+  uniform float uThreshold;
+  void main(){
+    vec3 c = texture(uTex, vUv).rgb;
+    float l = dot(c, vec3(0.2126,0.7152,0.0722));
+    float m = smoothstep(uThreshold, uThreshold+0.25, l);
+    fragColor = vec4(c * m, 1.0);
+  }`;
+
+  const blurFS = `#version 300 es
+  precision highp float;
+  in vec2 vUv; out vec4 fragColor;
+  uniform sampler2D uTex;
+  uniform vec2 uDir; // 1/width or 1/height
+  void main(){
+    // small gaussian-ish kernel
+    vec3 s = vec3(0);
+    s += texture(uTex, vUv + uDir * -4.0).rgb * 0.05;
+    s += texture(uTex, vUv + uDir * -2.0).rgb * 0.09;
+    s += texture(uTex, vUv + uDir * -1.0).rgb * 0.12;
+    s += texture(uTex, vUv).rgb             * 0.16;
+    s += texture(uTex, vUv + uDir *  1.0).rgb * 0.12;
+    s += texture(uTex, vUv + uDir *  2.0).rgb * 0.09;
+    s += texture(uTex, vUv + uDir *  4.0).rgb * 0.05;
+    fragColor = vec4(s, 1.0);
+  }`;
+
+  // --- Final composite: tone map + grading + palette cycle + optional analysis overlay ---
+  const finalFS = `#version 300 es
+  precision highp float;
+  in vec2 vUv; out vec4 fragColor;
+
+  uniform sampler2D uBase;
+  uniform sampler2D uBloom;
+
+  uniform vec2 uRes;
+  uniform float uTime;
+
+  uniform float uBloomAmt;
+  uniform float uExposure;
+  uniform float uContrast;
+  uniform float uSat;
+  uniform float uGamma;
+  uniform float uPalSpeed;
+
+  uniform int uMode;       // 0 art, 1 analysis
+  uniform int uOverlay;    // 0 none, 1 curl, 2 div, 3 stream
+  uniform float uOverlayA;
+
+  // For analysis overlay we reuse the flow field in screen-space (cheap)
+  uniform int   uPreset;
+  uniform float uAlpha;
+  uniform float uLambda;
+  uniform float uBeta;
+  uniform float uNoise;
+  uniform vec2  uCenter;
+  uniform float uZoom;
+
+  float hash(vec2 p){
+    p = fract(p*vec2(123.34, 456.21));
+    p += dot(p, p+78.233);
+    return fract(p.x*p.y);
+  }
+  float noise2(vec2 p){
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    float a = hash(i);
+    float b = hash(i+vec2(1,0));
+    float c = hash(i+vec2(0,1));
+    float d = hash(i+vec2(1,1));
+    vec2 u = f*f*(3.0-2.0*f);
+    return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
+  }
+
+  vec2 rot90(vec2 z){ return vec2(-z.y, z.x); }
+  vec2 csq(vec2 z){ return vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y); }
+  vec2 ccube(vec2 z){
+    return vec2(z.x*z.x*z.x - 3.0*z.x*z.y*z.y,
+                3.0*z.x*z.x*z.y - z.y*z.y*z.y);
+  }
+  vec2 csin(vec2 z){
+    float sx = sin(z.x), cx = cos(z.x);
+    float cy = cosh(z.y), sy = sinh(z.y);
+    return vec2(sx*cy, cx*sy);
+  }
+
+  vec2 projAxis(vec2 z, float phi){
+    vec2 u = vec2(cos(phi), sin(phi));
+    float d = dot(z,u);
+    return d*u;
+  }
+  vec2 projSoft(vec2 z, float phi, float lambda){
+    vec2 p = projAxis(z,phi);
+    vec2 perp = z - p;
+    float m = length(perp);
+    float g = 1.0 - tanh(lambda*m);
+    return mix(z,p,g);
+  }
+  float tension(vec2 fz, vec2 vz){
+    vec2 d = fz - vz;
+    return dot(d,d);
+  }
+
+  float potAt(vec2 x, float t, int preset, float alpha, float lambda){
+    float phi = (preset==2 ? 0.35 : 0.82) + 0.35*sin(t*0.17 + float(preset)*1.7);
+    vec2 drift = vec2(cos(t*0.11 + 1.3*float(preset)),
+                      sin(t*0.13 + 2.1*float(preset))) * 0.18;
+    vec2 s = x + 0.35*drift;
+    vec2 fz;
+    if (preset==0){
+      vec2 q = csq(s);
+      vec2 w = csin(0.85*s + vec2(0.2*sin(t*0.2),0.0));
+      fz = 0.78*q + 0.55*w;
+    } else if (preset==1){
+      vec2 c = ccube(0.75*s);
+      fz = 0.70*c + 0.35*rot90(s);
+    } else if (preset==2){
+      float braid = sin(t*0.23)*cos(t*0.19);
+      fz = csq(s) + (0.85+0.65*braid)*rot90(s);
+    } else {
+      vec2 w = csin(0.95*s);
+      vec2 q = csq(0.60*s);
+      fz = 0.90*w + 0.55*q;
+    }
+    fz *= alpha;
+    vec2 vz = projSoft(fz, phi, lambda);
+    float T = tension(fz,vz);
+    float r = length(x)+1e-6;
+    return (preset==1)
+      ? (0.70*T - 0.14*cos(2.5*r - t*0.4))
+      : (0.85*T - 0.10*cos(3.2*r + t*0.3));
+  }
+
+  vec2 field(vec2 x, float t, int preset, float alpha, float lambda, float beta, float noiseAmt){
+    float eps = 0.0025;
+    float px1 = potAt(x+vec2(eps,0), t, preset, alpha, lambda);
+    float px0 = potAt(x-vec2(eps,0), t, preset, alpha, lambda);
+    float py1 = potAt(x+vec2(0,eps), t, preset, alpha, lambda);
+    float py0 = potAt(x-vec2(0,eps), t, preset, alpha, lambda);
+    vec2 g = vec2((px1-px0)/(2.0*eps), (py1-py0)/(2.0*eps));
+
+    float swirl = beta * 0.55;
+    vec2 u = vec2(-g.y, g.x) * swirl;
+
+    float pot = potAt(x,t,preset,alpha,lambda);
+    float pull = (preset==0 ? 0.18 : (preset==2 ? 0.10 : 0.14));
+    float k = 1.0 - tanh(abs(pot));
+    u += -g * (pull * k);
+
+    if (noiseAmt > 0.0){
+      float ns = noise2(x*1.7 + vec2(t*0.25, -t*0.23));
+      float ang = (ns*2.0-1.0)*6.2831853;
+      u += vec2(cos(ang), sin(ang)) * noiseAmt * 0.12;
+    }
+    return u;
+  }
+
+  vec3 hueShift(vec3 c, float a){
+    // simple rotation in YIQ-ish space
+    float s = sin(a), co = cos(a);
+    mat3 m = mat3(
+      0.299, 0.587, 0.114,
+      0.596, -0.274, -0.322,
+      0.211, -0.523, 0.312
+    );
+    vec3 yiq = m * c;
+    float U = yiq.y*co - yiq.z*s;
+    float V = yiq.y*s  + yiq.z*co;
+    vec3 yiq2 = vec3(yiq.x, U, V);
+    mat3 im = mat3(
+      1.0, 0.956, 0.621,
+      1.0, -0.272, -0.647,
+      1.0, -1.106, 1.703
+    );
+    return im * yiq2;
+  }
+
+  vec3 tonemap(vec3 c){
+    // filmic-ish
+    c *= uExposure;
+    c = max(c, vec3(0));
+    c = (c*(2.51*c + 0.03)) / (c*(2.43*c + 0.59) + 0.14);
+    return clamp(c,0.0,1.0);
+  }
+
+  void main(){
+    vec3 base = texture(uBase, vUv).rgb;
+    vec3 blo  = texture(uBloom, vUv).rgb;
+
+    vec3 col = base + blo * uBloomAmt;
+
+    // palette cycling (subtle)
+    float h = uTime * (0.35 * uPalSpeed);
+    col = hueShift(col, h);
+
+    // tone map + grade
+    col = tonemap(col);
+    col = (col - 0.5) * uContrast + 0.5;
+
+    // saturation
+    float l = dot(col, vec3(0.2126,0.7152,0.0722));
+    col = mix(vec3(l), col, uSat);
+
+    // vignette
+    vec2 p = vUv*2.0 - 1.0;
+    float v = smoothstep(1.35, 0.35, length(p));
+    col *= (0.65 + 0.55*v);
+
+    // gamma
+    col = pow(max(col, vec3(0.0)), vec3(1.0/uGamma));
+
+    // analysis overlay (optional)
+    if (uMode==1 && uOverlay!=0){
+      float aspect = uRes.x/uRes.y;
+      vec2 q = (vUv*2.0 - 1.0);
+      q.x *= aspect;
+      vec2 theta = uCenter + q * (3.2 / uZoom);
+
+      // compute field diagnostics via finite differences
+      float e = 0.01;
+      vec2 u0 = field(theta, uTime, uPreset, uAlpha, uLambda, uBeta, uNoise);
+      vec2 ux1 = field(theta+vec2(e,0), uTime, uPreset, uAlpha, uLambda, uBeta, uNoise);
+      vec2 ux0 = field(theta-vec2(e,0), uTime, uPreset, uAlpha, uLambda, uBeta, uNoise);
+      vec2 uy1 = field(theta+vec2(0,e), uTime, uPreset, uAlpha, uLambda, uBeta, uNoise);
+      vec2 uy0 = field(theta-vec2(0,e), uTime, uPreset, uAlpha, uLambda, uBeta, uNoise);
+
+      float dudx = (ux1.x - ux0.x)/(2.0*e);
+      float dudy = (uy1.x - uy0.x)/(2.0*e);
+      float dvdx = (ux1.y - ux0.y)/(2.0*e);
+      float dvdy = (uy1.y - uy0.y)/(2.0*e);
+
+      float div = dudx + dvdy;
+      float curl = dvdx - dudy;
+
+      vec3 ov = vec3(0);
+      if (uOverlay==1){
+        float a = clamp(0.5 + 0.9*curl, 0.0, 1.0);
+        ov = mix(vec3(0.1,0.2,0.95), vec3(1.0,0.25,0.8), a);
+        ov *= smoothstep(0.02, 0.18, abs(curl));
+      } else if (uOverlay==2){
+        float a = clamp(0.5 + 0.9*div, 0.0, 1.0);
+        ov = mix(vec3(0.15,0.95,0.55), vec3(1.0,0.35,0.15), a);
+        ov *= smoothstep(0.02, 0.18, abs(div));
+      } else if (uOverlay==3){
+        // streamline-ish hatch: show direction as moving stripes
+        float ang = atan(u0.y, u0.x);
+        float stripes = 0.5 + 0.5*cos(24.0*(q.x*cos(ang)+q.y*sin(ang)) + uTime*2.0);
+        ov = vec3(stripes) * smoothstep(0.08, 0.35, length(u0));
+      }
+
+      col = mix(col, col + ov, uOverlayA);
+    }
+
+    fragColor = vec4(clamp(col,0.0,1.0), 1.0);
+  }`;
+
+  // --- Programs ---
+  const simProg    = link(quadVS.replace('aPos','aPos'), simFS);
+  const renderProg = link(renderVS, renderFS);
+  const fadeProg   = link(quadVS, fadeFS);
+  const brightProg = link(quadVS, brightFS);
+  const blurProg   = link(quadVS, blurFS);
+  const finalProg  = link(quadVS, finalFS);
+
+  // --- Uniform helpers ---
+  const U = (p,n)=>gl.getUniformLocation(p,n);
+  const uni1f=(p,n,v)=>gl.uniform1f(U(p,n),v);
+  const uni1i=(p,n,v)=>gl.uniform1i(U(p,n),v);
+  const uni2f=(p,n,a,b)=>gl.uniform2f(U(p,n),a,b);
+
+  // --- Fullscreen aPos attrib binding ---
+  function bindFullscreenAttrib(p){
+    gl.bindVertexArray(triVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, triBuf);
+    const loc = gl.getAttribLocation(p,"aPos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+  }
+
+  // --- Particle index buffer ---
+  let idxVao=null, idxBuf=null, particleCount=0, stateDim=512;
+  function makeIndexBuffer(n){
+    if (idxVao) gl.deleteVertexArray(idxVao);
+    if (idxBuf) gl.deleteBuffer(idxBuf);
+    idxVao = gl.createVertexArray();
+    gl.bindVertexArray(idxVao);
+    idxBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf);
+    const arr = new Float32Array(n);
+    for (let i=0;i<n;i++) arr[i]=i;
+    gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+  }
+
+  // --- Texture/FBO helpers ---
+  function makeTexFloat(w,h){
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, null);
+    return t;
+  }
+  function makeTexRGBA8(w,h,linear=true){
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, linear?gl.LINEAR:gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, linear?gl.LINEAR:gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    return t;
+  }
+  function makeFbo(tex){
+    const f = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("FBO incomplete");
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return f;
+  }
+  function clearFbo(fbo, r,g,b){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.clearColor(r,g,b,1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  // --- Particle ping-pong ---
+  let stateA=null,stateB=null,fboA=null,fboB=null;
+  function reseedParticles(dim){
+    stateDim = dim;
+    particleCount = dim*dim;
+
+    if (stateA) gl.deleteTexture(stateA);
+    if (stateB) gl.deleteTexture(stateB);
+    if (fboA) gl.deleteFramebuffer(fboA);
+    if (fboB) gl.deleteFramebuffer(fboB);
+
+    stateA = makeTexFloat(dim,dim);
+    stateB = makeTexFloat(dim,dim);
+    fboA = makeFbo(stateA);
+    fboB = makeFbo(stateB);
+
+    const init = new Float32Array(dim*dim*4);
+    for (let i=0;i<dim*dim;i++){
+      const u = Math.random();
+      let x,y;
+      if (u < 0.55){
+        const r = Math.sqrt(Math.random())*1.2;
+        const a = Math.random()*Math.PI*2;
+        x = r*Math.cos(a); y = r*Math.sin(a);
+      } else if (u < 0.85){
+        const r = 0.9 + 0.5*Math.random();
+        const a = Math.random()*Math.PI*2;
+        x = r*Math.cos(a); y = r*Math.sin(a);
+      } else {
+        x = (Math.random()*2-1)*1.4;
+        y = (Math.random()*2-1)*0.15;
+      }
+      init[i*4+0]=x;
+      init[i*4+1]=y;
+      init[i*4+2]=Math.random();
+      init[i*4+3]=Math.random();
+    }
+    gl.bindTexture(gl.TEXTURE_2D, stateA);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0,0, dim,dim, gl.RGBA, gl.FLOAT, init);
+
+    makeIndexBuffer(particleCount);
+    toast(`Reseeded: ${particleCount.toLocaleString()} particles`);
+  }
+
+  // --- Screen trail buffers (ping-pong) ---
+  let screenA=null,screenB=null,screenFboA=null,screenFboB=null;
+  function recreateScreenBuffers(){
+    const w=canvas.width,h=canvas.height;
+    for (const t of [screenA,screenB]) if (t) gl.deleteTexture(t);
+    for (const f of [screenFboA,screenFboB]) if (f) gl.deleteFramebuffer(f);
+
+    screenA = makeTexRGBA8(w,h,true);
+    screenB = makeTexRGBA8(w,h,true);
+    screenFboA = makeFbo(screenA);
+    screenFboB = makeFbo(screenB);
+
+    clearFbo(screenFboA, 0.02,0.03,0.05);
+    clearFbo(screenFboB, 0.02,0.03,0.05);
+  }
+  recreateScreenBuffers();
+
+  // --- Bloom buffers (half-res ping-pong) ---
+  let bloomW=0,bloomH=0;
+  let bloom1=null,bloom2=null,bloomFbo1=null,bloomFbo2=null;
+  function recreateBloomBuffers(){
+    bloomW = Math.max(2, (canvas.width/2)|0);
+    bloomH = Math.max(2, (canvas.height/2)|0);
+    for (const t of [bloom1,bloom2]) if (t) gl.deleteTexture(t);
+    for (const f of [bloomFbo1,bloomFbo2]) if (f) gl.deleteFramebuffer(f);
+    bloom1 = makeTexRGBA8(bloomW,bloomH,true);
+    bloom2 = makeTexRGBA8(bloomW,bloomH,true);
+    bloomFbo1 = makeFbo(bloom1);
+    bloomFbo2 = makeFbo(bloom2);
+    clearFbo(bloomFbo1,0,0,0);
+    clearFbo(bloomFbo2,0,0,0);
+  }
+  recreateBloomBuffers();
+
+  // --- Presets ---
+  function applyPreset(p){
+    if (p===0){
+      ui.alpha.value="0.86"; ui.lambda.value="1.65"; ui.beta.value="1.10";
+      ui.speed.value="1.05"; ui.noise.value="0.25"; ui.trail.value="0.06"; ui.zoom.value="1.65";
+      ui.bloom.value="1.05"; ui.bloomTh.value="0.18";
+      ui.exposure.value="1.20"; ui.contrast.value="1.15"; ui.sat.value="1.10"; ui.gamma.value="1.05";
+      camX=-0.08; camY=0.02;
+    } else if (p===1){
+      ui.alpha.value="0.90"; ui.lambda.value="1.25"; ui.beta.value="0.85";
+      ui.speed.value="0.92"; ui.noise.value="0.20"; ui.trail.value="0.055"; ui.zoom.value="1.80";
+      ui.bloom.value="0.85"; ui.bloomTh.value="0.20";
+      ui.exposure.value="1.15"; ui.contrast.value="1.12"; ui.sat.value="1.05"; ui.gamma.value="1.05";
+      camX=-0.02; camY=0.06;
+    } else if (p===2){
+      ui.alpha.value="0.84"; ui.lambda.value="2.10"; ui.beta.value="1.85";
+      ui.speed.value="1.18"; ui.noise.value="0.16"; ui.trail.value="0.06"; ui.zoom.value="2.15";
+      ui.bloom.value="1.10"; ui.bloomTh.value="0.16";
+      ui.exposure.value="1.25"; ui.contrast.value="1.16"; ui.sat.value="1.10"; ui.gamma.value="1.05";
+      camX=-0.12; camY=0.00;
+    } else {
+      ui.alpha.value="0.78"; ui.lambda.value="2.85"; ui.beta.value="1.35";
+      ui.speed.value="1.10"; ui.noise.value="0.30"; ui.trail.value="0.07"; ui.zoom.value="1.55";
+      ui.bloom.value="1.25"; ui.bloomTh.value="0.14";
+      ui.exposure.value="1.30"; ui.contrast.value="1.18"; ui.sat.value="1.20"; ui.gamma.value="1.03";
+      camX=0.02; camY=-0.03;
+    }
+    toast("Preset applied");
+  }
+
+  // --- JSON preset save/load ---
+  function getPresetJSON(){
+    return {
+      version: "wowplus-v1",
+      preset: +ui.preset.value,
+      mode: ui.mode.value,
+      overlay: +ui.overlay.value,
+      overlayA: +ui.overlayA.value,
+      grid: +ui.grid.value,
+      trail: +ui.trail.value,
+      pt: +ui.pt.value,
+      bloom: +ui.bloom.value,
+      bloomTh: +ui.bloomTh.value,
+      speed: +ui.speed.value,
+      alpha: +ui.alpha.value,
+      lambda: +ui.lambda.value,
+      beta: +ui.beta.value,
+      noise: +ui.noise.value,
+      zoom: +ui.zoom.value,
+      exposure: +ui.exposure.value,
+      contrast: +ui.contrast.value,
+      sat: +ui.sat.value,
+      gamma: +ui.gamma.value,
+      palSpeed: +ui.palSpeed.value,
+      driftOn: +ui.driftOn.value,
+      driftAmt: +ui.driftAmt.value,
+      driftSpd: +ui.driftSpd.value,
+      camX, camY
+    };
+  }
+  function applyPresetJSON(j){
+    const set = (el,val)=>{ if (el) el.value = String(val); };
+    if (typeof j.preset==="number") set(ui.preset,j.preset);
+    if (j.mode) set(ui.mode,j.mode);
+    if (typeof j.overlay==="number") set(ui.overlay,j.overlay);
+    if (typeof j.overlayA==="number") set(ui.overlayA,j.overlayA);
+
+    if (typeof j.grid==="number") set(ui.grid,j.grid);
+    if (typeof j.trail==="number") set(ui.trail,j.trail);
+    if (typeof j.pt==="number") set(ui.pt,j.pt);
+
+    if (typeof j.bloom==="number") set(ui.bloom,j.bloom);
+    if (typeof j.bloomTh==="number") set(ui.bloomTh,j.bloomTh);
+
+    if (typeof j.speed==="number") set(ui.speed,j.speed);
+    if (typeof j.alpha==="number") set(ui.alpha,j.alpha);
+    if (typeof j.lambda==="number") set(ui.lambda,j.lambda);
+    if (typeof j.beta==="number") set(ui.beta,j.beta);
+    if (typeof j.noise==="number") set(ui.noise,j.noise);
+    if (typeof j.zoom==="number") set(ui.zoom,j.zoom);
+
+    if (typeof j.exposure==="number") set(ui.exposure,j.exposure);
+    if (typeof j.contrast==="number") set(ui.contrast,j.contrast);
+    if (typeof j.sat==="number") set(ui.sat,j.sat);
+    if (typeof j.gamma==="number") set(ui.gamma,j.gamma);
+    if (typeof j.palSpeed==="number") set(ui.palSpeed,j.palSpeed);
+
+    if (typeof j.driftOn==="number") set(ui.driftOn,j.driftOn);
+    if (typeof j.driftAmt==="number") set(ui.driftAmt,j.driftAmt);
+    if (typeof j.driftSpd==="number") set(ui.driftSpd,j.driftSpd);
+
+    if (typeof j.camX==="number") camX=j.camX;
+    if (typeof j.camY==="number") camY=j.camY;
+
+    // if grid changed, reseed
+    reseedParticles(+ui.grid.value);
+    recreateScreenBuffers();
+    recreateBloomBuffers();
+    toast("Loaded JSON preset");
+  }
+
+  ui.savePreset.addEventListener('click', ()=>{
+    const j = getPresetJSON();
+    const blob = new Blob([JSON.stringify(j,null,2)], {type:"application/json"});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `voidflow_preset_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast("Preset JSON downloaded");
+  });
+
+  ui.loadPreset.addEventListener('change', async (e)=>{
+    const f = e.target.files?.[0];
+    if (!f) return;
+    try{
+      const txt = await f.text();
+      const j = JSON.parse(txt);
+      applyPresetJSON(j);
+    }catch(err){
+      console.error(err);
+      toast("Failed to load JSON");
+    } finally {
+      ui.loadPreset.value = "";
+    }
+  });
+
+  // --- Recording (WebM) ---
+  let recorder=null, chunks=[];
+  function startRecording(){
+    const stream = canvas.captureStream(60);
+    chunks = [];
+    recorder = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp9" });
+    recorder.ondataavailable = (e)=>{ if (e.data && e.data.size>0) chunks.push(e.data); };
+    recorder.onstop = ()=>{
+      const blob = new Blob(chunks, {type:"video/webm"});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `voidflow_${Date.now()}.webm`;
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+      toast("WebM saved");
+    };
+    recorder.start();
+    ui.recBtn.disabled = true;
+    ui.stopBtn.disabled = false;
+    ui.recBtn.textContent = "● Recording…";
+    toast("Recording started");
+  }
+  function stopRecording(){
+    if (recorder && recorder.state !== "inactive"){
+      recorder.stop();
+    }
+    ui.recBtn.disabled = false;
+    ui.stopBtn.disabled = true;
+    ui.recBtn.textContent = "● Record";
+  }
+  ui.recBtn.addEventListener('click', startRecording);
+  ui.stopBtn.addEventListener('click', stopRecording);
+
+  // --- UI hooks ---
+  let paused=false;
+  ui.pause.addEventListener('click', ()=>{ paused=!paused; ui.pause.textContent=paused?"Resume":"Pause"; });
+  ui.preset.addEventListener('change', ()=> applyPreset(+ui.preset.value));
+  ui.reseed.addEventListener('click', ()=> reseedParticles(+ui.grid.value));
+  ui.grid.addEventListener('change', ()=> reseedParticles(+ui.grid.value));
+
+  // --- Init particles ---
+  reseedParticles(+ui.grid.value);
+
+  // --- Ping-pong pointers ---
+  let curState=0; // 0 => A current, 1 => B current
+  let curScreen=0; // 0 => screenA current, 1 => screenB current
+
+  function texState(){ return (curState===0) ? stateA : stateB; }
+  function fboNextState(){ return (curState===0) ? fboB : fboA; }
+  function swapState(){ curState = 1-curState; }
+
+  function texScreen(){ return (curScreen===0) ? screenA : screenB; }
+  function fboNextScreen(){ return (curScreen===0) ? screenFboB : screenFboA; }
+  function texNextScreen(){ return (curScreen===0) ? screenB : screenA; }
+  function swapScreen(){ curScreen = 1-curScreen; }
+
+  // --- Main loop ---
+  let lastMs = performance.now();
+  let fpsFrames=0, fpsAcc=0;
+
+  function draw(nowMs){
+    const now = nowMs*0.001;
+    const dt = Math.min(0.035, (nowMs-lastMs)/1000);
+    lastMs = nowMs;
+
+    // camera drift (optional)
+    if (+ui.driftOn.value === 1){
+      const amt = +ui.driftAmt.value;
+      const spd = +ui.driftSpd.value;
+      // gentle, non-loop-feeling drift
+      camX += (Math.cos(now*0.17*spd) * 0.0008 + Math.cos(now*0.071*spd)*0.0006) * amt / Math.max(0.8, +ui.zoom.value);
+      camY += (Math.sin(now*0.13*spd) * 0.0008 + Math.sin(now*0.091*spd)*0.0006) * amt / Math.max(0.8, +ui.zoom.value);
+    }
+
+    // 1) SIM to next particle texture
+    if (!paused){
+      gl.useProgram(simProg);
+      bindFullscreenAttrib(simProg);
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fboNextState());
+      gl.viewport(0,0,stateDim,stateDim);
+
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texState());
+      uni1i(simProg,"uState",0);
+      uni1f(simProg,"uTime",now);
+      uni1f(simProg,"uDt", dt * (+ui.speed.value) * 0.9);
+
+      uni1i(simProg,"uPreset", +ui.preset.value);
+      uni1f(simProg,"uAlpha", +ui.alpha.value);
+      uni1f(simProg,"uLambda", +ui.lambda.value);
+      uni1f(simProg,"uBeta", +ui.beta.value);
+      uni1f(simProg,"uNoise", +ui.noise.value);
+
+      gl.drawArrays(gl.TRIANGLES,0,3);
+      swapState();
+    }
+
+    // restore viewport to canvas
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0,0,canvas.width,canvas.height);
+
+    // 2) Fade trails: current screen -> next screen
+    gl.useProgram(fadeProg);
+    bindFullscreenAttrib(fadeProg);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fboNextScreen());
+    gl.viewport(0,0,canvas.width,canvas.height);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texScreen());
+    uni1i(fadeProg,"uTex",0);
+    uni1f(fadeProg,"uFade", +ui.trail.value);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+
+    // 3) Draw particles into next screen (additive)
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+    gl.useProgram(renderProg);
+    gl.bindVertexArray(idxVao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fboNextScreen());
+    gl.viewport(0,0,canvas.width,canvas.height);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texState());
+    uni1i(renderProg,"uState",0);
+
+    uni2f(renderProg,"uStateDim", stateDim, stateDim);
+    uni2f(renderProg,"uRes", canvas.width, canvas.height);
+    uni2f(renderProg,"uCenter", camX, camY);
+    uni1f(renderProg,"uZoom", +ui.zoom.value);
+    uni1f(renderProg,"uPointSize", (+ui.pt.value) * dpr());
+
+    gl.drawArrays(gl.POINTS, 0, particleCount);
+    gl.disable(gl.BLEND);
+
+    // Now texNextScreen() contains the updated trails+particles (since we drew into fboNextScreen)
+    // 4) BLOOM pipeline (half-res): bright-pass -> blur h -> blur v
+    const baseTex = texNextScreen();
+
+    // 4a bright-pass
+    gl.useProgram(brightProg);
+    bindFullscreenAttrib(brightProg);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, bloomFbo1);
+    gl.viewport(0,0,bloomW,bloomH);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, baseTex);
+    uni1i(brightProg,"uTex",0);
+    uni1f(brightProg,"uThreshold", +ui.bloomTh.value);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+
+    // 4b blur horizontal
+    gl.useProgram(blurProg);
+    bindFullscreenAttrib(blurProg);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, bloomFbo2);
+    gl.viewport(0,0,bloomW,bloomH);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, bloom1);
+    uni1i(blurProg,"uTex",0);
+    uni2f(blurProg,"uDir", 1.0/bloomW, 0.0);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+
+    // 4c blur vertical
+    gl.bindFramebuffer(gl.FRAMEBUFFER, bloomFbo1);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, bloom2);
+    uni1i(blurProg,"uTex",0);
+    uni2f(blurProg,"uDir", 0.0, 1.0/bloomH);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+
+    // 5) FINAL composite to canvas (base + bloom + grading + palette + analysis overlay)
+    gl.useProgram(finalProg);
+    bindFullscreenAttrib(finalProg);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0,0,canvas.width,canvas.height);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, baseTex);
+    uni1i(finalProg,"uBase",0);
+
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, bloom1);
+    uni1i(finalProg,"uBloom",1);
+
+    uni2f(finalProg,"uRes", canvas.width, canvas.height);
+    uni1f(finalProg,"uTime", now);
+
+    uni1f(finalProg,"uBloomAmt", +ui.bloom.value);
+    uni1f(finalProg,"uExposure", +ui.exposure.value);
+    uni1f(finalProg,"uContrast", +ui.contrast.value);
+    uni1f(finalProg,"uSat", +ui.sat.value);
+    uni1f(finalProg,"uGamma", +ui.gamma.value);
+    uni1f(finalProg,"uPalSpeed", +ui.palSpeed.value);
+
+    const mode = (ui.mode.value === "analysis") ? 1 : 0;
+    uni1i(finalProg,"uMode", mode);
+    uni1i(finalProg,"uOverlay", +ui.overlay.value);
+    uni1f(finalProg,"uOverlayA", +ui.overlayA.value);
+
+    // analysis needs field params + camera
+    uni1i(finalProg,"uPreset", +ui.preset.value);
+    uni1f(finalProg,"uAlpha", +ui.alpha.value);
+    uni1f(finalProg,"uLambda", +ui.lambda.value);
+    uni1f(finalProg,"uBeta", +ui.beta.value);
+    uni1f(finalProg,"uNoise", +ui.noise.value);
+    uni2f(finalProg,"uCenter", camX, camY);
+    uni1f(finalProg,"uZoom", +ui.zoom.value);
+
+    gl.drawArrays(gl.TRIANGLES,0,3);
+
+    // swap screen ping-pong (screenB becomes current if we wrote into it)
+    swapScreen();
+
+    // FPS HUD
+    fpsFrames++; fpsAcc += dt;
+    if (fpsAcc > 0.6){
+      const fps = fpsFrames / fpsAcc;
+      hudEl.textContent = `${fps.toFixed(0)} fps • ${particleCount.toLocaleString()} • bloom ${(+ui.bloom.value).toFixed(2)}`;
+      fpsFrames=0; fpsAcc=0;
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  // Ensure initial preset and buffers match
+  applyPreset(+ui.preset.value);
+  recreateScreenBuffers();
+  recreateBloomBuffers();
+  requestAnimationFrame(draw);
+
+})();
+</script>
+</body>
+</html>
