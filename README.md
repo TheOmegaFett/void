@@ -1,7 +1,7 @@
 # Void Flow WOW+
 
 [![CI - Test and Quality](https://github.com/TheOmegaFett/void/actions/workflows/ci.yml/badge.svg)](https://github.com/TheOmegaFett/void/actions/workflows/ci.yml)
-[![CD - Deploy Staging](https://github.com/TheOmegaFett/void/actions/workflows/deploy_staging.yml/badge.svg)](https://github.com/TheOmegaFett/void/actions/workflows/deploy_staging.yml)
+[![CD - Deploy Staging](https://github.com/TheOmegaFett/void/actions/workflows/deploy_staging.yml/badge.svg?branch=develop)](https://github.com/TheOmegaFett/void/actions/workflows/deploy_staging.yml)
 [![CD - Deploy Production](https://github.com/TheOmegaFett/void/actions/workflows/deploy_prod.yml/badge.svg?branch=v1.0.10)](https://github.com/TheOmegaFett/void/actions/workflows/deploy_prod.yml)
 [![Post-Deploy Smoke Tests](https://github.com/TheOmegaFett/void/actions/workflows/post_deploy_smoke.yml/badge.svg)](https://github.com/TheOmegaFett/void/actions/workflows/post_deploy_smoke.yml)
 ![Node 20](https://img.shields.io/badge/node-20.x-339933?logo=node.js&logoColor=white)
