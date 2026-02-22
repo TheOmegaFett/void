@@ -69,6 +69,9 @@ jobs:
 
       - name: Deploy to Cloud Run (creates new revision)
         run: |
+          SAFE_REPO_LABEL="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9_-]#-#g' | cut -c1-63)"
+          if [[ -z "$SAFE_REPO_LABEL" ]]; then SAFE_REPO_LABEL="repo"; fi
+
           gcloud run deploy "${{ secrets.CLOUD_RUN_SERVICE }}" \
             --image "$IMAGE_URI" \
             --project "${{ secrets.GCP_PROJECT_ID }}" \
@@ -76,5 +79,5 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --set-env-vars "NODE_ENV=${{ inputs.environment }}" \
-            --labels "env=${{ inputs.environment }},commit=${{ github.sha }},repo=${{ github.repository }}" \
+            --labels "env=${{ inputs.environment }},commit=${{ github.sha }},repo=${SAFE_REPO_LABEL}" \
             --quiet
