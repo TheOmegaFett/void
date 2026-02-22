@@ -6,9 +6,6 @@ on:
       environment:
         required: true
         type: string
-      service_name:
-        required: true
-        type: string
     secrets:
       GCP_PROJECT_ID:
         required: true
@@ -19,6 +16,8 @@ on:
       GCP_WIF_PROVIDER:
         required: true
       GCP_SERVICE_ACCOUNT_EMAIL:
+        required: true
+      CLOUD_RUN_SERVICE:
         required: true
 
 permissions:
@@ -55,7 +54,7 @@ jobs:
 
       - name: Deploy to Cloud Run (creates new revision)
         run: |
-          gcloud run deploy "${{ inputs.service_name }}" \
+          gcloud run deploy "${{ secrets.CLOUD_RUN_SERVICE }}" \
             --image "$IMAGE_URI" \
             --project "${{ secrets.GCP_PROJECT_ID }}" \
             --region "${{ secrets.GCP_REGION }}" \
