@@ -45,6 +45,14 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Validate Artifact Registry repo location
+        run: |
+          echo "Expecting registry host: ${{ secrets.GCP_REGION }}-docker.pkg.dev"
+          gcloud artifacts repositories describe "${{ secrets.ARTIFACT_REPO }}" \
+            --project "${{ secrets.GCP_PROJECT_ID }}" \
+            --location "${{ secrets.GCP_REGION }}" \
+            --format="value(name)" >/dev/null
+
       - name: Login to Artifact Registry
         uses: docker/login-action@v3
         with:
