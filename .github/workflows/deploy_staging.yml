@@ -9,10 +9,10 @@ jobs:
     uses: ./.github/workflows/deploy_reusable.yml
     with:
       environment: staging
-      service_name: ${{ secrets.CLOUD_RUN_SERVICE_STAGING }}
     secrets:
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
       GCP_REGION: ${{ secrets.GCP_REGION }}
       ARTIFACT_REPO: ${{ secrets.ARTIFACT_REPO }}
       GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
       GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      CLOUD_RUN_SERVICE: ${{ secrets.CLOUD_RUN_SERVICE_STAGING }}
