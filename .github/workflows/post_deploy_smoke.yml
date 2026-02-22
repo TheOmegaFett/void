@@ -14,7 +14,7 @@ jobs:
   smoke:
     if: |
       github.event_name == 'schedule' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      github.event_name == 'workflow_run'
     runs-on: ubuntu-latest
 
     steps:
@@ -36,10 +36,15 @@ jobs:
           fi
 
       - name: Smoke test (workflow_run target)
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
         run: |
           echo "Smoke testing $ENV: $TARGET_URL" | tee smoke-artifacts/smoke-$ENV.log
           curl -fsS "$TARGET_URL/health" 2>&1 | tee -a smoke-artifacts/smoke-$ENV.log
+
+      - name: Record skipped smoke reason (workflow_run non-success)
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'
+        run: |
+          echo "Smoke test not executed because deploy concluded '${{ github.event.workflow_run.conclusion }}'." | tee smoke-artifacts/smoke-$ENV.log
 
       - name: Smoke test (scheduled - staging + prod)
         if: github.event_name == 'schedule'
