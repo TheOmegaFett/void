@@ -7,6 +7,7 @@ on:
 
 jobs:
   deploy-prod:
+    environment: production
     uses: ./.github/workflows/deploy_reusable.yml
     with:
       environment: production

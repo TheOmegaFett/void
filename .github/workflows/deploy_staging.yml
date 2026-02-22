@@ -6,6 +6,7 @@ on:
 
 jobs:
   deploy-staging:
+    environment: staging
     uses: ./.github/workflows/deploy_reusable.yml
     with:
       environment: staging
