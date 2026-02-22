@@ -42,18 +42,37 @@ If you are contributing code or operating deploys:
 - Developer instructions: `docs/tutorials/developer-guide.md`
 - Main workflows: `.github/workflows/ci.yml`, `.github/workflows/deploy_reusable.yml`
 
+## Tool Choice
+
+- Source control and collaboration: Git + GitHub, chosen for branch/tag-based release flow and native pull request checks.
+- CI/CD orchestration: GitHub Actions, chosen because pipeline definitions live in-repo and are easy to version/review.
+- Runtime platform: Google Cloud Run, chosen for managed autoscaling and low operational overhead for stateless HTTP service.
+- Container image storage: Google Artifact Registry, chosen for tight IAM integration and regional proximity to deploy target.
+- Cloud authentication: GitHub OIDC federation to GCP, chosen to avoid long-lived JSON keys and reduce credential risk.
+- Application stack: Node.js + Express, chosen for a small, fast API/static-serving footprint with simple testability.
+
 ## Alternatives Comparison
 
-- GitHub Actions vs Jenkins/GitLab CI: GitHub Actions is repo-native and quick to maintain; Jenkins/GitLab CI can be more customizable but usually require more platform operations work.
-- Cloud Run vs Compute Engine (VM) vs GKE: Cloud Run is best for low-ops stateless services; Compute Engine gives full machine control; GKE is strongest for multi-service Kubernetes orchestration.
-- Artifact Registry vs Docker Hub: Artifact Registry integrates directly with GCP IAM, regions, and private infra; Docker Hub is broad and convenient for public or cross-platform image distribution.
-- OIDC federation vs JSON key files: OIDC is preferred for short-lived credentials and lower secret risk; JSON key files are simpler initially but increase key management and leakage risk.
+### HD Comparison Summary (Why These Choices Here)
+
+- GitHub Actions vs Jenkins/GitLab CI: this project uses GitHub Actions because workflows are repo-native, versioned with code, and fast to maintain; Jenkins/GitLab CI are valid alternatives but add more platform/admin overhead for this scope.
+- Cloud Run vs Compute Engine vs GKE: this project uses Cloud Run because the service is stateless HTTP and benefits from managed autoscaling with minimal ops; Compute Engine is better for VM-level control and GKE for larger multi-service Kubernetes platforms.
+- Artifact Registry vs Docker Hub: this project uses Artifact Registry because deployment, IAM, and regional hosting are all in GCP; Docker Hub is useful for broad/public distribution but is not as tightly integrated with GCP permissions.
+- OIDC federation vs JSON key files: this project uses OIDC because credentials are short-lived and do not require storing long-lived private keys; JSON key files are easier initially but increase secret handling and leakage risk.
 
 ## Evidence Examples
 
 - Example CI artifact: `test-artifacts/junit.xml` and `test-artifacts/test-output.log`
 - Example deploy revision: `void-flow-prod-00001-...` in Cloud Run
 - Example smoke test: `curl /health` and artifact `smoke-artifacts/*`
+
+## HD Evidence Checklist (Screenshots)
+
+- CI run passing (`CI - Test & Quality`) and the Artifacts tab showing `test-artifacts/*`
+- Cloud Run revisions list showing new revision(s) after deploy
+- Staging deploy run passing (`CD - Deploy Staging`)
+- Production deploy run passing (`CD - Deploy Production`)
+- Smoke test run passing (`Post-Deploy Smoke Tests`) and artifact `smoke-artifacts/*`
 
 ## Architecture
 
@@ -224,6 +243,13 @@ Serves the static HTML app from `public/index.html`.
 ```bash
 curl -I https://void-flow-prod-496494976110.australia-southeast1.run.app/
 ```
+
+## Workflows
+
+- `CI - Test & Quality` (`.github/workflows/ci.yml`) -> Trigger: pull requests and pushes to `main`/`develop` -> What it does: install, lint, run tests with JUnit -> What it outputs: `test-artifacts/junit.xml` and `test-artifacts/test-output.log`
+- `CD - Deploy Staging` (`.github/workflows/deploy_staging.yml`) -> Trigger: push to `develop` -> What it does: build image, push to Artifact Registry, deploy Cloud Run staging via reusable workflow -> What it outputs: deployed staging service at `STAGING_URL` and a new Cloud Run revision (for example `void-flow-staging-0000x-...`)
+- `CD - Deploy Production` (`.github/workflows/deploy_prod.yml`) -> Trigger: pushed tag matching `v*.*.*` -> What it does: build image, push to Artifact Registry, deploy Cloud Run production via reusable workflow -> What it outputs: deployed production URL `https://void-flow-prod-496494976110.australia-southeast1.run.app/` and a new revision (for example `void-flow-prod-00001-...`)
+- `Post-Deploy Smoke Tests` (`.github/workflows/post_deploy_smoke.yml`) -> Trigger: completed staging/production deploy workflows and daily schedule -> What it does: call `/health` endpoints and capture status -> What it outputs: `smoke-artifacts/*` logs for workflow-run or scheduled checks
 
 ## CI/CD Workflows
 
