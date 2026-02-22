@@ -5,6 +5,10 @@ on:
     tags:
       - "v*.*.*"
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   deploy-prod:
     uses: ./.github/workflows/deploy_reusable.yml
