@@ -42,6 +42,19 @@ If you are contributing code or operating deploys:
 - Developer instructions: `docs/tutorials/developer-guide.md`
 - Main workflows: `.github/workflows/ci.yml`, `.github/workflows/deploy_reusable.yml`
 
+## Alternatives Comparison
+
+- GitHub Actions vs Jenkins/GitLab CI: GitHub Actions is repo-native and quick to maintain; Jenkins/GitLab CI can be more customizable but usually require more platform operations work.
+- Cloud Run vs Compute Engine (VM) vs GKE: Cloud Run is best for low-ops stateless services; Compute Engine gives full machine control; GKE is strongest for multi-service Kubernetes orchestration.
+- Artifact Registry vs Docker Hub: Artifact Registry integrates directly with GCP IAM, regions, and private infra; Docker Hub is broad and convenient for public or cross-platform image distribution.
+- OIDC federation vs JSON key files: OIDC is preferred for short-lived credentials and lower secret risk; JSON key files are simpler initially but increase key management and leakage risk.
+
+## Evidence Examples
+
+- Example CI artifact: `test-artifacts/junit.xml` and `test-artifacts/test-output.log`
+- Example deploy revision: `void-flow-prod-00001-...` in Cloud Run
+- Example smoke test: `curl /health` and artifact `smoke-artifacts/*`
+
 ## Architecture
 
 ```mermaid
