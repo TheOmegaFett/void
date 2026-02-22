@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Home</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Home</h1>
+
+    
+
+
+
+    
+
+
+    <h3> </h3>
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+    <section>
+        <article><h1>Void Flow WOW+</h1>
+<p><a href="https://github.com/TheOmegaFett/void/actions/workflows/ci.yml"><img src="https://github.com/TheOmegaFett/void/actions/workflows/ci.yml/badge.svg" alt="CI - Test and Quality"></a>
+<a href="https://github.com/TheOmegaFett/void/actions/workflows/deploy_staging.yml"><img src="https://github.com/TheOmegaFett/void/actions/workflows/deploy_staging.yml/badge.svg" alt="CD - Deploy Staging"></a>
+<a href="https://github.com/TheOmegaFett/void/actions/workflows/deploy_prod.yml"><img src="https://github.com/TheOmegaFett/void/actions/workflows/deploy_prod.yml/badge.svg" alt="CD - Deploy Production"></a>
+<a href="https://github.com/TheOmegaFett/void/actions/workflows/post_deploy_smoke.yml"><img src="https://github.com/TheOmegaFett/void/actions/workflows/post_deploy_smoke.yml/badge.svg" alt="Post-Deploy Smoke Tests"></a>
+<img src="https://img.shields.io/badge/node-20.x-339933?logo=node.js&amp;logoColor=white" alt="Node 20">
+<img src="https://img.shields.io/badge/deploy-google_cloud_run-4285F4?logo=googlecloud&amp;logoColor=white" alt="Deploy Target"></p>
+<p>Node.js + Express app serving static content, with CI, staged deployments to Google Cloud Run, and post-deploy smoke checks.</p>
+<ul>
+<li>Repository: https://github.com/TheOmegaFett/void</li>
+<li>Production URL: https://void-flow-prod-496494976110.australia-southeast1.run.app/</li>
+</ul>
+<h2>Overview</h2>
+<p>This repository includes:</p>
+<ul>
+<li>A lightweight Express server (<code>src/server.js</code>, <code>src/index.js</code>)</li>
+<li>Static frontend served from <code>public/index.html</code></li>
+<li>CI workflow for linting and tests with uploaded artifacts</li>
+<li>Reusable Cloud Run deployment workflow for staging and production</li>
+<li>Smoke tests that run after deployment and on a schedule</li>
+</ul>
+<h2>Website User Guide</h2>
+<p>If you want to use the app (not develop it), start here:</p>
+<ul>
+<li>Production app: https://void-flow-prod-496494976110.australia-southeast1.run.app/</li>
+<li>User instructions: <code>docs/tutorials/using-the-website.md</code></li>
+</ul>
+<p>Quick tips:</p>
+<ul>
+<li>Use preset buttons and sliders to explore visuals.</li>
+<li>Use <code>Record</code> / <code>Stop</code> to capture output.</li>
+<li>Check service health at <code>/health</code>.</li>
+</ul>
+<h2>Developer Guide</h2>
+<p>If you are contributing code or operating deploys:</p>
+<ul>
+<li>Developer instructions: <code>docs/tutorials/developer-guide.md</code></li>
+<li>Main workflows: <code>.github/workflows/ci.yml</code>, <code>.github/workflows/deploy_reusable.yml</code></li>
+</ul>
+<h2>Architecture</h2>
+<pre class="prettyprint source lang-mermaid"><code>flowchart LR
+  Dev[Developer Push or PR] --> CI[CI - Test and Quality]
+  CI --> Lint[eslint]
+  CI --> Tests[jest]
+  Tests --> CIArtifacts[Upload test artifacts]
+
+  Develop[Push to develop] --> StagingWF[CD - Deploy Staging]
+  Tag[Push vX.Y.Z tag] --> ProdWF[CD - Deploy Production]
+
+  StagingWF --> Reusable[Reusable Deploy Workflow]
+  ProdWF --> Reusable
+
+  Reusable --> AR[Artifact Registry]
+  Reusable --> CloudRun[Google Cloud Run]
+  CloudRun --> Smoke[Post-Deploy Smoke Tests]
+  Cron[Nightly schedule] --> Smoke
+</code></pre>
+<h2>Project Structure</h2>
+<pre class="prettyprint source lang-text"><code>.
+|-- .github/workflows/
+|   |-- ci.yml
+|   |-- deploy_reusable.yml
+|   |-- deploy_staging.yml
+|   |-- deploy_prod.yml
+|   `-- post_deploy_smoke.yml
+|-- public/
+|   `-- index.html
+|-- src/
+|   |-- server.js
+|   `-- index.js
+|-- tests/
+|   `-- health.test.js
+|-- Dockerfile
+`-- package.json
+</code></pre>
+<h2>Prerequisites</h2>
+<ul>
+<li>Node.js 20.x</li>
+<li>npm 10+</li>
+<li>Docker (optional, for local container testing)</li>
+<li>Git</li>
+</ul>
+<h2>Local Installation</h2>
+<ol>
+<li>Clone and enter the repo:</li>
+</ol>
+<pre class="prettyprint source lang-bash"><code>git clone https://github.com/TheOmegaFett/void.git
+cd void
+</code></pre>
+<ol start="2">
+<li>Install dependencies:</li>
+</ol>
+<pre class="prettyprint source lang-bash"><code>npm ci
+</code></pre>
+<ol start="3">
+<li>(Optional) create local env file:</li>
+</ol>
+<pre class="prettyprint source lang-bash"><code>cp .env.example .env
+</code></pre>
+<h2>Run Locally</h2>
+<pre class="prettyprint source lang-bash"><code>npm start
+</code></pre>
+<p>Server starts on <code>PORT</code> (default <code>8080</code>).</p>
+<p>Open:</p>
+<ul>
+<li>http://localhost:8080/</li>
+<li>http://localhost:8080/health</li>
+</ul>
+<h2>Testing and Quality</h2>
+<p>Run lint:</p>
+<pre class="prettyprint source lang-bash"><code>npm run lint
+</code></pre>
+<p>Run tests:</p>
+<pre class="prettyprint source lang-bash"><code>npm test
+</code></pre>
+<p>Run tests with JUnit output (same mode used in CI):</p>
+<pre class="prettyprint source lang-bash"><code>npm run test:junit
+</code></pre>
+<h2>Generate Documentation from Docstrings</h2>
+<p>Source docstrings are written in <code>src/server.js</code> and <code>src/index.js</code> using JSDoc.</p>
+<p>Generate docs automatically:</p>
+<pre class="prettyprint source lang-bash"><code>npm run docs:generate
+</code></pre>
+<p>Output:</p>
+<ul>
+<li>Generated API docs site: <code>docs/api/index.html</code></li>
+<li>Included tutorials:
+<ul>
+<li><code>docs/tutorials/using-the-website.md</code></li>
+<li><code>docs/tutorials/developer-guide.md</code></li>
+</ul>
+</li>
+</ul>
+<h2>Docker (Local)</h2>
+<p>Build:</p>
+<pre class="prettyprint source lang-bash"><code>docker build -t void-flow-wowplus:local .
+</code></pre>
+<p>Run:</p>
+<pre class="prettyprint source lang-bash"><code>docker run --rm -p 8080:8080 void-flow-wowplus:local
+</code></pre>
+<p>Health check:</p>
+<pre class="prettyprint source lang-bash"><code>curl -sS http://localhost:8080/health
+</code></pre>
+<h2>API Endpoints and Examples</h2>
+<h3><code>GET /health</code></h3>
+<p>Returns JSON health response:</p>
+<pre class="prettyprint source lang-json"><code>{&quot;ok&quot;: true, &quot;env&quot;: &quot;production&quot;}
+</code></pre>
+<p>Local example:</p>
+<pre class="prettyprint source lang-bash"><code>curl -sS http://localhost:8080/health
+</code></pre>
+<p>Production example:</p>
+<pre class="prettyprint source lang-bash"><code>curl -sS https://void-flow-prod-496494976110.australia-southeast1.run.app/health
+</code></pre>
+<h3><code>GET /</code></h3>
+<p>Serves the static HTML app from <code>public/index.html</code>.</p>
+<pre class="prettyprint source lang-bash"><code>curl -I https://void-flow-prod-496494976110.australia-southeast1.run.app/
+</code></pre>
+<h2>CI/CD Workflows</h2>
+<ul>
+<li><code>ci.yml</code>
+<ul>
+<li>Trigger: pull requests, and pushes to <code>main</code> and <code>develop</code></li>
+<li>Runs: install, lint, tests, artifact upload</li>
+</ul>
+</li>
+<li><code>deploy_staging.yml</code>
+<ul>
+<li>Trigger: push to <code>develop</code></li>
+<li>Calls reusable deploy with <code>environment: staging</code></li>
+</ul>
+</li>
+<li><code>deploy_prod.yml</code>
+<ul>
+<li>Trigger: pushed tags matching <code>v*.*.*</code></li>
+<li>Calls reusable deploy with <code>environment: production</code></li>
+</ul>
+</li>
+<li><code>deploy_reusable.yml</code>
+<ul>
+<li>Auth via OIDC, validates Artifact Registry location, logs in to registry, builds/pushes image, deploys Cloud Run</li>
+</ul>
+</li>
+<li><code>post_deploy_smoke.yml</code>
+<ul>
+<li>Trigger: completed deploy workflows and daily schedule</li>
+<li>Runs smoke checks on <code>/health</code></li>
+</ul>
+</li>
+</ul>
+<h2>Deployment Setup (GitHub Secrets)</h2>
+<p>Set the following repository secrets:</p>
+<ul>
+<li><code>GCP_PROJECT_ID</code></li>
+<li><code>GCP_REGION</code></li>
+<li><code>ARTIFACT_REPO</code></li>
+<li><code>GCP_WIF_PROVIDER</code></li>
+<li><code>GCP_SERVICE_ACCOUNT_EMAIL</code></li>
+<li><code>CLOUD_RUN_SERVICE_STAGING</code></li>
+<li><code>CLOUD_RUN_SERVICE_PROD</code></li>
+<li><code>STAGING_URL</code></li>
+<li><code>PROD_URL</code></li>
+</ul>
+<p>Important:</p>
+<ul>
+<li><code>GCP_REGION</code> must match the Artifact Registry repository location.</li>
+<li>Registry host is built as <code>${GCP_REGION}-docker.pkg.dev</code>.</li>
+</ul>
+<h2>Deploy Instructions</h2>
+<h3>Staging</h3>
+<p>Push to <code>develop</code>:</p>
+<pre class="prettyprint source lang-bash"><code>git checkout develop
+git push origin develop
+</code></pre>
+<h3>Production</h3>
+<p>Create and push a semantic version tag:</p>
+<pre class="prettyprint source lang-bash"><code>git checkout Main
+git pull
+git tag -a v1.0.10 -m &quot;Production release v1.0.10&quot;
+git push origin v1.0.10
+</code></pre>
+<p>This triggers <code>.github/workflows/deploy_prod.yml</code>.</p>
+<h2>Verifying Deployment</h2>
+<p>Check production health:</p>
+<pre class="prettyprint source lang-bash"><code>curl -sS https://void-flow-prod-496494976110.australia-southeast1.run.app/health
+</code></pre>
+<p>Check Actions runs:</p>
+<ul>
+<li>https://github.com/TheOmegaFett/void/actions</li>
+</ul>
+<h2>Troubleshooting</h2>
+<ul>
+<li><code>Unauthenticated request ... uploadArtifacts</code>
+<ul>
+<li>Verify OIDC auth and Artifact Registry role bindings on the deploy service account.</li>
+<li>Verify <code>GCP_REGION</code> matches the Artifact Registry repo location.</li>
+</ul>
+</li>
+<li><code>metadata.labels ... violates format constraints</code>
+<ul>
+<li>Deployment workflow now sanitizes repository label values before deploy.</li>
+</ul>
+</li>
+<li><code>container failed to start and listen on PORT=8080</code>
+<ul>
+<li>Ensure container entrypoint starts <code>src/index.js</code> (the process that listens).</li>
+</ul>
+</li>
+</ul></article>
+    </section>
+
+
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-index.html">index</a></li><li><a href="module-server.html">server</a></li></ul><h3>Tutorials</h3><ul><li><a href="tutorial-developer-guide.html">developer-guide</a></li><li><a href="tutorial-using-the-website.html">using-the-website</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Sun Feb 22 2026 09:36:10 GMT+0800 (Australian Western Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

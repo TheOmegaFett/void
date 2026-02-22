@@ -1,7 +1,7 @@
 export default [
   {
     files: ["**/*.js"],
-    ignores: ["node_modules/**", "coverage/**"],
+    ignores: ["node_modules/**", "coverage/**", "docs/api/**"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
@@ -23,6 +23,10 @@ export default [
         test: "readonly",
         expect: "readonly"
       }
+    },
+    rules: {
+      "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+      "no-undef": "error"
     }
   }
 ];
