@@ -37,6 +37,18 @@
   .kbd{font-family:ui-monospace,Menlo,Consolas,monospace;background:rgba(255,255,255,.08);padding:1px 6px;border-radius:8px;border:1px solid rgba(255,255,255,.12)}
   .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid rgba(140,200,255,.22);background:rgba(140,200,255,.08);font-size:12px}
   .right{margin-left:auto}
+  #settingsBody{
+    max-height:min(72vh, 620px);
+    overflow:auto;
+    opacity:1;
+    transition:max-height .2s ease, opacity .18s ease;
+  }
+  #settingsPanel.settings-collapsed #settingsBody{
+    max-height:0;
+    opacity:0;
+    overflow:hidden;
+    pointer-events:none;
+  }
   #toast{
     position:fixed;left:14px;bottom:14px;
     background:rgba(8,12,18,.72);
@@ -56,12 +68,14 @@
 <div id="toast"></div>
 
 <div id="ui">
-  <div class="card">
+  <div class="card" id="settingsPanel">
     <div class="row" style="margin-top:0">
       <div class="title">Void Flow WOW+ — GPU bloom / grading / drift / record / analysis</div>
-      <div class="pill right" id="hud">— fps</div>
+      <button id="toggleSettings" class="right" aria-expanded="true" aria-controls="settingsBody">Hide settings</button>
+      <div class="pill" id="hud">— fps</div>
     </div>
 
+    <div id="settingsBody">
     <div class="row">
       <label>Preset</label>
       <select id="preset">
@@ -137,8 +151,8 @@
     <div class="row">
       <label>Camera drift</label>
       <select id="driftOn">
-        <option value="0">Off</option>
-        <option value="1" selected>On</option>
+        <option value="0" selected>Off</option>
+        <option value="1">On</option>
       </select>
       <label>Drift</label><input id="driftAmt" type="range" min="0.0" max="1.0" step="0.01" value="0.25"/>
       <label>DriftSpd</label><input id="driftSpd" type="range" min="0.05" max="1.5" step="0.01" value="0.35"/>
@@ -147,6 +161,7 @@
     <div class="muted">
       Click to recenter. Scroll to zoom. Keys <span class="kbd">1</span>–<span class="kbd">4</span> presets.
       For speed: set grid to <b>512</b> or <b>384</b>. Bloom costs GPU time; lower Bloom or use 1M particles with Bloom ~0.3.
+    </div>
     </div>
   </div>
 </div>
@@ -162,6 +177,7 @@
 
   const $ = (id)=>document.getElementById(id);
   const ui = {
+    toggleSettings:$('toggleSettings'),
     preset:$('preset'), reseed:$('reseed'), pause:$('pause'),
     recBtn:$('recBtn'), stopBtn:$('stopBtn'),
     savePreset:$('savePreset'), loadPreset:$('loadPreset'),
@@ -174,6 +190,9 @@
     palSpeed:$('palSpeed'),
     driftOn:$('driftOn'), driftAmt:$('driftAmt'), driftSpd:$('driftSpd'),
   };
+  const settingsPanelEl = $('settingsPanel');
+  const settingsBodyEl = $('settingsBody');
+  let settingsCollapsed = false;
 
   function toast(msg){
     toastEl.textContent = msg;
@@ -181,6 +200,16 @@
     clearTimeout(toastEl._t);
     toastEl._t = setTimeout(()=>toastEl.classList.remove('show'), 1800);
   }
+
+  function setSettingsCollapsed(collapsed){
+    settingsCollapsed = collapsed;
+    settingsPanelEl.classList.toggle('settings-collapsed', collapsed);
+    ui.toggleSettings.textContent = collapsed ? "Show settings" : "Hide settings";
+    ui.toggleSettings.setAttribute('aria-expanded', String(!collapsed));
+    settingsBodyEl.setAttribute('aria-hidden', String(collapsed));
+  }
+  ui.toggleSettings.addEventListener('click', ()=> setSettingsCollapsed(!settingsCollapsed));
+  setSettingsCollapsed(false);
 
   // --- Extensions ---
   const extFloat = gl.getExtension('EXT_color_buffer_float');
